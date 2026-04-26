@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TIC · TAC · TOE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bungee&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --grid: #1e1e2e;
+      --x-color: #ff3c6e;
+      --o-color: #00e8c6;
+      --x-glow: rgba(255,60,110,0.5);
+      --o-glow: rgba(0,232,198,0.5);
+      --text: #e8e8f0;
+      --muted: #5a5a7a;
+      --accent: #7b5ea7;
+      --win-bg: #1a1a28;
+      --easy-color: #4ade80;
+      --med-color: #facc15;
+      --hard-color: #ff3c6e;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 100; opacity: 0.4;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(123,94,167,0.08) 0%, transparent 70%);
+      top: 50%; left: 50%; transform: translate(-50%,-50%);
+      pointer-events: none;
+    }
+
+    .wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── HEADER ── */
+    .title-row { display: flex; align-items: center; gap: 14px; }
+    .title {
+      font-family: 'Bungee', cursive;
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      letter-spacing: 0.15em;
+      background: linear-gradient(135deg, var(--x-color) 0%, var(--accent) 50%, var(--o-color) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 24px rgba(123,94,167,0.6));
+    }
+    .icon-btn {
+      background: var(--surface);
+      border: 1px solid var(--grid);
+      border-radius: 8px;
+      padding: 7px 10px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 1rem;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    .icon-btn:hover { border-color: var(--accent); color: var(--text); box-shadow: 0 0 10px rgba(123,94,167,0.3); }
+
+    /* ── TOGGLES ── */
+    .toggle-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
+    .pill-group {
+      display: flex;
+      background: var(--surface);
+      border: 1px solid var(--grid);
+      border-radius: 8px;
+      overflow: hidden;
+      font-size: 0.65rem;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+    .pill { padding: 6px 14px; cursor: pointer; color: var(--muted); transition: all 0.2s; white-space: nowrap; }
+    .pill.active { background: rgba(123,94,167,0.25); color: var(--text); }
+    .pill.easy.active   { background: rgba(74,222,128,0.18);  color: var(--easy-color); }
+    .pill.medium.active { background: rgba(250,204,21,0.18);  color: var(--med-color); }
+    .pill.hard.active   { background: rgba(255,60,110,0.18);  color: var(--hard-color); }
+
+    /* ── SCORE BAR ── */
+    .score-bar { display: flex; align-items: center; gap: 16px; }
+    .score-card {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      padding: 10px 18px;
+      background: var(--surface);
+      border-radius: 10px;
+      border: 1px solid var(--grid);
+      min-width: 100px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+      cursor: pointer;
+      position: relative;
+    }
+    .score-card:hover { border-color: rgba(255,255,255,0.15); }
+    .score-card.active-x { border-color: var(--x-color); box-shadow: 0 0 14px var(--x-glow); }
+    .score-card.active-o { border-color: var(--o-color); box-shadow: 0 0 14px var(--o-glow); }
+    .card-edit { position: absolute; top: 5px; right: 6px; font-size: 0.6rem; opacity: 0; transition: opacity 0.2s; color: var(--muted); }
+    .score-card:hover .card-edit { opacity: 1; }
+    .card-name { font-size: 0.62rem; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .card-score { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+    .score-card:nth-child(1) .card-score { color: var(--x-color); }
+    .score-card:nth-child(3) .card-score { color: var(--o-color); }
+    .card-record { font-size: 0.55rem; color: var(--muted); letter-spacing: 0.04em; }
+    .score-divider { color: var(--muted); font-size: 1.4rem; font-weight: 700; }
+
+    /* ── STATUS ── */
+    .status { font-size: 0.82rem; letter-spacing: 0.07em; color: var(--muted); height: 20px; text-align: center; transition: color 0.3s; }
+    .status.turn-x { color: var(--x-color); }
+    .status.turn-o { color: var(--o-color); }
+    .status.win-x  { color: var(--x-color); font-weight: 700; }
+    .status.win-o  { color: var(--o-color); font-weight: 700; }
+    .status.draw   { color: var(--text); }
+
+    /* ── BOARD ── */
+    .board {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 10px; padding: 14px;
+      background: var(--grid);
+      border-radius: 18px;
+      box-shadow: 0 0 40px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.04);
+    }
+    .cell {
+      width: clamp(84px, 21vw, 108px); height: clamp(84px, 21vw, 108px);
+      background: var(--surface); border-radius: 12px;
+      border: 1.5px solid transparent;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, transform 0.15s;
+      position: relative; overflow: hidden;
+    }
+    .cell:hover:not(.taken):not(.locked) { background: #16161f; border-color: rgba(255,255,255,0.08); transform: scale(1.03); }
+    .cell.taken  { cursor: default; }
+    .cell.locked { cursor: default; }
+    .cell.win-cell.x-cell { border-color: var(--x-color); box-shadow: 0 0 20px var(--x-glow), inset 0 0 20px rgba(255,60,110,0.1); }
+    .cell.win-cell.o-cell { border-color: var(--o-color); box-shadow: 0 0 20px var(--o-glow), inset 0 0 20px rgba(0,232,198,0.1); }
+    .cell svg { width: 52%; height: 52%; }
+    .x-mark { stroke: var(--x-color); stroke-width: 6; stroke-linecap: round; fill: none; filter: drop-shadow(0 0 6px var(--x-color)); }
+    .o-mark { stroke: var(--o-color); stroke-width: 5.5; fill: none; filter: drop-shadow(0 0 6px var(--o-color)); }
+    .x-line-1, .x-line-2 { stroke-dasharray: 100; stroke-dashoffset: 100; animation: draw-line 0.22s ease-out forwards; }
+    .x-line-2 { animation-delay: 0.1s; }
+    .o-circle { stroke-dasharray: 251; stroke-dashoffset: 251; animation: draw-circle 0.3s ease-out forwards; }
+    @keyframes draw-line   { to { stroke-dashoffset: 0; } }
+    @keyframes draw-circle { to { stroke-dashoffset: 0; } }
+    .cell:not(.taken):not(.locked) .ghost { display: flex; opacity: 0; transition: opacity 0.15s; }
+    .cell:not(.taken):not(.locked):hover .ghost { opacity: 0.2; }
+    @keyframes cell-pop {
+      0%  { transform: scale(0.5); opacity: 0; }
+      70% { transform: scale(1.1); }
+      100%{ transform: scale(1);   opacity: 1; }
+    }
+    .cell-pop { animation: cell-pop 0.25s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+    /* ── HOME BUTTON ── */
+    .home-btn {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--muted); text-decoration: none;
+      border: 1.5px solid var(--grid);
+      background: var(--surface);
+      padding: 7px 14px; border-radius: 8px;
+      display: inline-flex; align-items: center; gap: 7px;
+      transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
+      align-self: flex-start;
+    }
+    .home-btn:hover {
+      color: var(--o-color);
+      border-color: var(--o-color);
+      box-shadow: 0 0 10px var(--o-glow);
+    }
+
+    /* ── ACTIONS ── */
+    .actions { display: flex; gap: 10px; }
+    .btn {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.68rem; letter-spacing: 0.09em; text-transform: uppercase;
+      padding: 8px 18px; border-radius: 8px;
+      border: 1.5px solid var(--grid);
+      background: var(--surface); color: var(--muted);
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--text); box-shadow: 0 0 10px rgba(123,94,167,0.3); }
+    .btn.primary { border-color: var(--accent); color: var(--text); background: rgba(123,94,167,0.15); }
+    .btn.primary:hover { background: rgba(123,94,167,0.3); box-shadow: 0 0 16px rgba(123,94,167,0.4); }
+
+    /* ── MODAL BASE ── */
+    .modal {
+      position: fixed; inset: 0;
+      background: rgba(10,10,15,0.82);
+      backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 50; opacity: 0; pointer-events: none;
+      transition: opacity 0.35s;
+    }
+    .modal.show { opacity: 1; pointer-events: auto; }
+    .modal-card {
+      background: var(--win-bg);
+      border: 1px solid var(--grid);
+      border-radius: 20px;
+      padding: 36px 40px;
+      width: min(460px, 92vw);
+      display: flex; flex-direction: column; gap: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+      transform: scale(0.9) translateY(12px);
+      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      max-height: 90vh; overflow-y: auto;
+      position: relative;
+    }
+    .modal.show .modal-card { transform: scale(1) translateY(0); }
+    .modal-title { font-family: 'Bungee', cursive; font-size: 1.3rem; letter-spacing: 0.1em; }
+    .modal-close { position: absolute; top: 14px; right: 18px; cursor: pointer; color: var(--muted); font-size: 1.1rem; transition: color 0.2s; background: none; border: none; font-family: inherit; }
+    .modal-close:hover { color: var(--text); }
+
+    /* ── WIN OVERLAY ── */
+    .overlay-emoji { font-size: 3rem; text-align: center; }
+    .overlay-title { font-family: 'Bungee', cursive; font-size: 1.7rem; letter-spacing: 0.08em; text-align: center; }
+    .overlay-title.win-x { color: var(--x-color); text-shadow: 0 0 20px var(--x-glow); }
+    .overlay-title.win-o { color: var(--o-color); text-shadow: 0 0 20px var(--o-glow); }
+    .overlay-title.draw  { color: var(--text); }
+    .overlay-sub  { color: var(--muted); font-size: 0.76rem; letter-spacing: 0.06em; text-align: center; }
+    .overlay-btns { display: flex; gap: 12px; justify-content: center; }
+
+    /* ── PROFILE MODAL ── */
+    .profile-fields { display: flex; flex-direction: column; gap: 16px; }
+    .field-group { display: flex; flex-direction: column; gap: 6px; }
+    .field-label { font-size: 0.65rem; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; }
+    .field-input {
+      font-family: 'Space Mono', monospace; font-size: 0.85rem;
+      background: var(--surface); border: 1.5px solid var(--grid);
+      border-radius: 8px; padding: 10px 14px; color: var(--text);
+      outline: none; transition: border-color 0.2s;
+    }
+    .field-input:focus { border-color: var(--accent); }
+    .field-input.x-inp:focus { border-color: var(--x-color); }
+    .field-input.o-inp:focus { border-color: var(--o-color); }
+
+    /* ── SCOREBOARD ── */
+    .sb-tabs { display: flex; gap: 8px; }
+    .sb-tab {
+      font-size: 0.65rem; padding: 6px 14px; border-radius: 6px;
+      border: 1px solid var(--grid); background: transparent;
+      color: var(--muted); cursor: pointer; font-family: inherit;
+      letter-spacing: 0.08em; text-transform: uppercase; transition: all 0.2s;
+    }
+    .sb-tab.active { background: rgba(123,94,167,0.2); border-color: var(--accent); color: var(--text); }
+
+    .sb-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat-box { background: var(--surface); border: 1px solid var(--grid); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+    .stat-label { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+    .stat-val { font-size: 1.5rem; font-weight: 700; }
+    .stat-val.wins   { color: var(--easy-color); }
+    .stat-val.losses { color: var(--x-color); }
+    .stat-val.draws  { color: var(--med-color); }
+    .stat-val.pct    { color: var(--accent); }
+
+    .sb-history { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+    .sb-history::-webkit-scrollbar { width: 4px; }
+    .sb-history::-webkit-scrollbar-thumb { background: var(--grid); border-radius: 4px; }
+
+    .history-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; background: var(--surface);
+      border-radius: 8px; border: 1px solid var(--grid);
+      font-size: 0.64rem; color: var(--muted);
+    }
+    .history-result { font-weight: 700; font-size: 0.68rem; }
+    .history-result.win  { color: var(--easy-color); }
+    .history-result.loss { color: var(--x-color); }
+    .history-result.draw { color: var(--med-color); }
+    .history-empty { color: var(--muted); font-size: 0.72rem; text-align: center; padding: 20px; }
+
+    .sb-section-label { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.07em; text-transform: uppercase; }
+    .sb-clear-btn {
+      font-family: 'Space Mono', monospace; font-size: 0.62rem; letter-spacing: 0.08em;
+      text-transform: uppercase; padding: 7px 14px; border-radius: 6px;
+      border: 1px solid var(--grid); background: transparent; color: var(--muted);
+      cursor: pointer; transition: all 0.2s; align-self: flex-start;
+    }
+    .sb-clear-btn:hover { border-color: var(--x-color); color: var(--x-color); }
+
+    /* ── CONFETTI ── */
+    .confetti-piece { position: fixed; border-radius: 2px; z-index: 200; pointer-events: none; animation: confetti-fall 1.8s ease-in forwards; }
+    @keyframes confetti-fall {
+      0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+
+    @media (max-width: 440px) {
+      .wrapper { gap: 14px; }
+      .board { gap: 7px; padding: 11px; }
+      .cell { width: 88px; height: 88px; border-radius: 10px; }
+      .modal-card { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <a class="home-btn" href="../../index.html">&#9664; Mankar Games</a>
+
+  <!-- Header -->
+  <div class="title-row">
+    <h1 class="title">TIC · TAC · TOE</h1>
+    <button class="icon-btn" onclick="openScoreboard()" title="Scoreboard">🏆</button>
+  </div>
+
+  <!-- Mode + Difficulty -->
+  <div class="toggle-row">
+    <div class="pill-group">
+      <div class="pill active" id="btn-pvp" onclick="setMode('pvp')">2 Players</div>
+      <div class="pill"        id="btn-ai"  onclick="setMode('ai')">vs AI</div>
+    </div>
+    <div class="pill-group" id="diff-group" style="display:none">
+      <div class="pill easy   active" id="diff-easy"   onclick="setDifficulty('easy')">Easy</div>
+      <div class="pill medium"        id="diff-medium" onclick="setDifficulty('medium')">Medium</div>
+      <div class="pill hard"          id="diff-hard"   onclick="setDifficulty('hard')">Hard</div>
+    </div>
+  </div>
+
+  <!-- Score bar -->
+  <div class="score-bar">
+    <div class="score-card" id="card-x" onclick="openProfile()">
+      <span class="card-edit">✏️</span>
+      <span class="card-name"  id="name-x">Player X</span>
+      <span class="card-score" id="score-x">0</span>
+      <span class="card-record" id="record-x">0W · 0L · 0D</span>
+    </div>
+    <span class="score-divider">·</span>
+    <div class="score-card" id="card-o" onclick="openProfile()">
+      <span class="card-edit">✏️</span>
+      <span class="card-name"  id="name-o">Player O</span>
+      <span class="card-score" id="score-o">0</span>
+      <span class="card-record" id="record-o">0W · 0L · 0D</span>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status turn-x" id="status">Player X's turn</div>
+
+  <!-- Board -->
+  <div class="board" id="board"></div>
+
+  <!-- Actions -->
+  <div class="actions">
+    <button class="btn primary" onclick="newRound()">New Round</button>
+    <button class="btn" onclick="resetSession()">Reset Session</button>
+  </div>
+</div>
+
+<!-- ── WIN OVERLAY ── -->
+<div class="modal" id="win-modal">
+  <div class="modal-card" style="align-items:center">
+    <div class="overlay-emoji" id="overlay-emoji">🏆</div>
+    <div class="overlay-title" id="overlay-title">Player X Wins!</div>
+    <div class="overlay-sub"   id="overlay-sub">Outstanding play</div>
+    <div class="overlay-btns" style="margin-top:6px">
+      <button class="btn primary" onclick="newRound()">Play Again</button>
+      <button class="btn"         onclick="resetSession()">Reset</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PROFILE MODAL ── -->
+<div class="modal" id="profile-modal">
+  <div class="modal-card">
+    <button class="modal-close" onclick="closeProfile()">✕</button>
+    <div class="modal-title">👤 Player Profiles</div>
+    <div class="profile-fields">
+      <div class="field-group">
+        <label class="field-label" style="color:var(--x-color)">Player X — Name</label>
+        <input class="field-input x-inp" id="inp-x" maxlength="16" placeholder="e.g. Alex" autocomplete="off">
+      </div>
+      <div class="field-group" id="o-name-group">
+        <label class="field-label" style="color:var(--o-color)">Player O — Name</label>
+        <input class="field-input o-inp" id="inp-o" maxlength="16" placeholder="e.g. Jordan" autocomplete="off">
+      </div>
+    </div>
+    <button class="btn primary" style="align-self:flex-end" onclick="saveProfile()">Save →</button>
+  </div>
+</div>
+
+<!-- ── SCOREBOARD MODAL ── -->
+<div class="modal" id="sb-modal">
+  <div class="modal-card">
+    <button class="modal-close" onclick="closeScoreboard()">✕</button>
+    <div class="modal-title">🏆 Scoreboard</div>
+    <div class="sb-tabs">
+      <button class="sb-tab active" id="tab-x" onclick="sbShow('X')"><span id="sb-lbl-x">Player X</span></button>
+      <button class="sb-tab"        id="tab-o" onclick="sbShow('O')"><span id="sb-lbl-o">Player O</span></button>
+    </div>
+    <div class="sb-stats" id="sb-stats"></div>
+    <div class="sb-section-label">Match History</div>
+    <div class="sb-history" id="sb-history"></div>
+    <button class="sb-clear-btn" onclick="clearHistory()">Clear All History</button>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════
+//  STORAGE
+// ════════════════════════════
+function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+function load(k)  { try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+
+// ════════════════════════════
+//  STATE
+// ════════════════════════════
+let board      = Array(9).fill(null);
+let current    = 'X';
+let scores     = { X:0, O:0 };
+let mode       = 'pvp';
+let difficulty = 'easy';
+let locked     = false;
+let sbPlayer   = 'X';
+
+const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+let profiles = load('ttt_profiles') || { X:'Player X', O:'Player O' };
+let history  = load('ttt_history')  || [];
+
+// ════════════════════════════
+//  DOM REFS
+// ════════════════════════════
+const boardEl   = document.getElementById('board');
+const statusEl  = document.getElementById('status');
+const scoreXEl  = document.getElementById('score-x');
+const scoreOEl  = document.getElementById('score-o');
+const cardXEl   = document.getElementById('card-x');
+const cardOEl   = document.getElementById('card-o');
+const nameXEl   = document.getElementById('name-x');
+const nameOEl   = document.getElementById('name-o');
+const recordXEl = document.getElementById('record-x');
+const recordOEl = document.getElementById('record-o');
+const winModal  = document.getElementById('win-modal');
+
+// ════════════════════════════
+//  BOARD
+// ════════════════════════════
+function buildBoard() {
+  boardEl.innerHTML = '';
+  board.forEach((val, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'cell' + (val?' taken':'') + (locked?' locked':'');
+    if (val) {
+      cell.innerHTML = markHTML(val);
+    } else if (!locked) {
+      const g = document.createElement('div');
+      g.className = 'ghost';
+      g.innerHTML = markHTML(current, true);
+      cell.appendChild(g);
+      cell.addEventListener('click', () => handleClick(i));
+    }
+    boardEl.appendChild(cell);
+  });
+  updateCards();
+}
+
+function markHTML(p, ghost=false) {
+  const cls = ghost ? 'ghost' : 'cell-pop';
+  return p === 'X'
+    ? `<svg viewBox="0 0 80 80" class="${cls}"><line class="x-mark x-line-1" x1="18" y1="18" x2="62" y2="62"/><line class="x-mark x-line-2" x1="62" y1="18" x2="18" y2="62"/></svg>`
+    : `<svg viewBox="0 0 80 80" class="${cls}"><circle class="o-mark o-circle" cx="40" cy="40" r="24"/></svg>`;
+}
+
+// ════════════════════════════
+//  GAME LOGIC
+// ════════════════════════════
+function handleClick(i) {
+  if (locked || board[i]) return;
+  makeMove(i, current);
+}
+
+function makeMove(i, p) {
+  board[i] = p;
+  buildBoard();
+  const win = checkWin(p);
+  if (win) { highlightWin(win, p); endGame(p, 'win'); return; }
+  if (board.every(Boolean)) { endGame(null, 'draw'); return; }
+  current = current === 'X' ? 'O' : 'X';
+  setStatus();
+  if (mode === 'ai' && current === 'O') {
+    locked = true; updateCards();
+    const delay = { easy:320, medium:450, hard:580 }[difficulty];
+    setTimeout(doAI, delay);
+  }
+}
+
+function highlightWin(combo, p) {
+  const cells = boardEl.querySelectorAll('.cell');
+  combo.forEach(i => cells[i].classList.add('win-cell', p==='X'?'x-cell':'o-cell'));
+}
+
+function checkWin(p) { return WINS.find(([a,b,c]) => board[a]===p&&board[b]===p&&board[c]===p)||null; }
+function checkWinB(b, p) { return WINS.some(([a,bv,c]) => b[a]===p&&b[bv]===p&&b[c]===p); }
+
+// ════════════════════════════
+//  AI
+// ════════════════════════════
+function doAI() {
+  locked = false;
+  const empty = board.map((v,i) => v?null:i).filter(v=>v!==null);
+  if (!empty.length) return;
+  let idx;
+  if (difficulty === 'easy') {
+    idx = empty[Math.floor(Math.random()*empty.length)];
+  } else if (difficulty === 'medium') {
+    const inst = findInstant();
+    idx = inst !== -1 ? inst : (Math.random()<0.6 ? minimax(board.slice(),'O',0).idx : empty[Math.floor(Math.random()*empty.length)]);
+  } else {
+    idx = minimax(board.slice(),'O',0).idx;
+  }
+  makeMove(idx, 'O');
+}
+
+function findInstant() {
+  const empty = board.map((v,i)=>v?null:i).filter(v=>v!==null);
+  for (const p of ['O','X']) {
+    for (const i of empty) { const b=board.slice(); b[i]=p; if(checkWinB(b,p)) return i; }
+  }
+  return -1;
+}
+
+function minimax(b, p, depth) {
+  if (checkWinB(b,'O')) return {score:10-depth};
+  if (checkWinB(b,'X')) return {score:-10+depth};
+  const empty = b.map((v,i)=>v?null:i).filter(v=>v!==null);
+  if (!empty.length) return {score:0};
+  const moves = empty.map(i => { const nb=b.slice(); nb[i]=p; return {idx:i, score:minimax(nb,p==='O'?'X':'O',depth+1).score}; });
+  return moves.reduce((best,m) => p==='O' ? (m.score>best.score?m:best) : (m.score<best.score?m:best));
+}
+
+// ════════════════════════════
+//  END GAME
+// ════════════════════════════
+function endGame(winner, type) {
+  locked = true;
+  history.unshift({ winner, nameX:profiles.X, nameO:profiles.O, mode, difficulty, date:new Date().toLocaleDateString(undefined,{month:'short',day:'numeric'}) });
+  if (history.length > 100) history.pop();
+  save('ttt_history', history);
+  updateRecords();
+
+  const oTitle = document.getElementById('overlay-title');
+  const oEmoji = document.getElementById('overlay-emoji');
+  const oSub   = document.getElementById('overlay-sub');
+
+  if (type === 'win') {
+    scores[winner]++;
+    scoreXEl.textContent = scores.X;
+    scoreOEl.textContent = scores.O;
+    const name = pName(winner);
+    statusEl.textContent = `${name} wins!`;
+    statusEl.className = `status win-${winner.toLowerCase()}`;
+    oTitle.textContent = `${name} Wins!`;
+    oTitle.className   = `overlay-title win-${winner.toLowerCase()}`;
+    oEmoji.textContent = winner==='X' ? '🔥' : '✨';
+    oSub.textContent   = pickPhrase();
+    setTimeout(()=>{ showModal(winModal); launchConfetti(winner); }, 350);
+  } else {
+    statusEl.textContent = "It's a draw!";
+    statusEl.className   = 'status draw';
+    oTitle.textContent   = "It's a Draw!";
+    oTitle.className     = 'overlay-title draw';
+    oEmoji.textContent   = '🤝';
+    oSub.textContent     = 'Evenly matched';
+    setTimeout(()=>showModal(winModal), 350);
+  }
+}
+
+// ════════════════════════════
+//  ROUND / SESSION
+// ════════════════════════════
+function newRound() {
+  closeModal(winModal);
+  board=Array(9).fill(null); current='X'; locked=false;
+  setStatus(); buildBoard();
+}
+function resetSession() {
+  scores={X:0,O:0}; scoreXEl.textContent=0; scoreOEl.textContent=0; newRound();
+}
+
+// ════════════════════════════
+//  MODE / DIFFICULTY
+// ════════════════════════════
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-pvp').classList.toggle('active', m==='pvp');
+  document.getElementById('btn-ai').classList.toggle('active',  m==='ai');
+  document.getElementById('diff-group').style.display = m==='ai' ? 'flex' : 'none';
+  document.getElementById('o-name-group').style.display = m==='ai' ? 'none' : 'block';
+  nameOEl.textContent = m==='ai' ? diffLabel() : profiles.O;
+  resetSession();
+}
+
+function setDifficulty(d) {
+  difficulty = d;
+  ['easy','medium','hard'].forEach(x => document.getElementById(`diff-${x}`).classList.toggle('active', x===d));
+  nameOEl.textContent = diffLabel();
+  newRound();
+}
+
+function diffLabel() { return {easy:'AI · Easy', medium:'AI · Medium', hard:'AI · Hard'}[difficulty]; }
+
+// ════════════════════════════
+//  UI HELPERS
+// ════════════════════════════
+function setStatus() {
+  statusEl.textContent = `${pName(current)}'s turn`;
+  statusEl.className   = `status turn-${current.toLowerCase()}`;
+}
+function updateCards() {
+  cardXEl.className = 'score-card' + (current==='X'&&!locked?' active-x':'');
+  cardOEl.className = 'score-card' + (current==='O'&&!locked?' active-o':'');
+}
+function pName(p) { return p==='X' ? profiles.X : (mode==='ai' ? diffLabel() : profiles.O); }
+function pickPhrase() {
+  const arr=['Flawless execution','Dominant performance','Masterful strategy','No contest','Pure genius','Absolutely unstoppable'];
+  return arr[Math.floor(Math.random()*arr.length)];
+}
+function updateRecords() {
+  ['X','O'].forEach(p => {
+    const r = getRecord(p);
+    document.getElementById(`record-${p.toLowerCase()}`).textContent = `${r.w}W · ${r.l}L · ${r.d}D`;
+  });
+}
+function getRecord(p) {
+  let w=0,l=0,d=0;
+  history.forEach(h => { if(!h.winner){d++;}else if(h.winner===p){w++;}else{l++;} });
+  return {w,l,d};
+}
+
+// ════════════════════════════
+//  MODALS
+// ════════════════════════════
+function showModal(el) { el.classList.add('show'); }
+function closeModal(el){ el.classList.remove('show'); }
+
+['profile-modal','sb-modal'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('click', e => { if (e.target===el) closeModal(el); });
+});
+
+// ── Profile ──────────────────
+function openProfile() {
+  document.getElementById('inp-x').value = profiles.X;
+  document.getElementById('inp-o').value = profiles.O;
+  document.getElementById('o-name-group').style.display = mode==='ai' ? 'none' : 'block';
+  showModal(document.getElementById('profile-modal'));
+}
+function closeProfile() { closeModal(document.getElementById('profile-modal')); }
+function saveProfile() {
+  const nx = document.getElementById('inp-x').value.trim() || 'Player X';
+  const no = document.getElementById('inp-o').value.trim() || 'Player O';
+  profiles.X = nx; profiles.O = no;
+  save('ttt_profiles', profiles);
+  renderNames(); closeProfile();
+}
+function renderNames() {
+  nameXEl.textContent = profiles.X;
+  nameOEl.textContent = mode==='ai' ? diffLabel() : profiles.O;
+  document.getElementById('sb-lbl-x').textContent = profiles.X;
+  document.getElementById('sb-lbl-o').textContent = mode==='ai' ? 'Computer' : profiles.O;
+  setStatus(); updateRecords();
+}
+
+// ── Scoreboard ───────────────
+function openScoreboard() {
+  document.getElementById('sb-lbl-x').textContent = profiles.X;
+  document.getElementById('sb-lbl-o').textContent = mode==='ai' ? 'Computer' : profiles.O;
+  sbShow('X');
+  showModal(document.getElementById('sb-modal'));
+}
+function closeScoreboard() { closeModal(document.getElementById('sb-modal')); }
+
+function sbShow(p) {
+  sbPlayer = p;
+  document.getElementById('tab-x').classList.toggle('active', p==='X');
+  document.getElementById('tab-o').classList.toggle('active', p==='O');
+  const r = getRecord(p);
+  const total = r.w+r.l+r.d;
+  const pct = total ? Math.round(r.w/total*100) : 0;
+  document.getElementById('sb-stats').innerHTML = `
+    <div class="stat-box"><div class="stat-label">Wins</div><div class="stat-val wins">${r.w}</div></div>
+    <div class="stat-box"><div class="stat-label">Losses</div><div class="stat-val losses">${r.l}</div></div>
+    <div class="stat-box"><div class="stat-label">Draws</div><div class="stat-val draws">${r.d}</div></div>
+    <div class="stat-box"><div class="stat-label">Win Rate</div><div class="stat-val pct">${pct}%</div></div>`;
+  const histEl = document.getElementById('sb-history');
+  const rows = history.slice(0,30);
+  if (!rows.length) { histEl.innerHTML=`<div class="history-empty">No matches yet — start playing!</div>`; return; }
+  histEl.innerHTML = rows.map(h => {
+    let result, cls;
+    if (!h.winner){result='Draw';cls='draw';}
+    else if(h.winner===p){result='Win';cls='win';}
+    else{result='Loss';cls='loss';}
+    const label = h.mode==='ai' ? `vs AI (${h.difficulty||'?'})` : `${h.nameX} vs ${h.nameO}`;
+    return `<div class="history-row"><span>${label}</span><span style="color:var(--muted)">${h.date||''}</span><span class="history-result ${cls}">${result}</span></div>`;
+  }).join('');
+}
+
+function clearHistory() {
+  if (!confirm('Clear all match history?')) return;
+  history=[]; save('ttt_history', history); updateRecords(); sbShow(sbPlayer);
+}
+
+// ════════════════════════════
+//  CONFETTI
+// ════════════════════════════
+function launchConfetti(player) {
+  const colors = player==='X' ? ['#ff3c6e','#ff6e9a','#ff1f5a','#ffc0cb'] : ['#00e8c6','#00c9a9','#80fff0','#00fff5'];
+  for (let i=0;i<60;i++) {
+    const p=document.createElement('div');
+    p.className='confetti-piece';
+    p.style.cssText=`left:${Math.random()*100}vw;top:-20px;background:${colors[Math.floor(Math.random()*colors.length)]};animation-delay:${Math.random()*.8}s;animation-duration:${1.2+Math.random()}s;width:${6+Math.random()*8}px;height:${6+Math.random()*8}px;`;
+    document.body.appendChild(p);
+    p.addEventListener('animationend',()=>p.remove());
+  }
+}
+
+// ════════════════════════════
+//  INIT
+// ════════════════════════════
+renderNames(); updateRecords(); setStatus(); buildBoard();
+</script>
+</body>
+</html>
